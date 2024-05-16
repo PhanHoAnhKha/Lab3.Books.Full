@@ -5,31 +5,56 @@ using WebApi03.Models;
 
 namespace WebApi03.Services
 {
-    public class BookRepository : IBookRepository
+    public class SQLBookRepository : IBookRepository
     {
         private readonly AppDbContext _dbContext;
 
-        public BookRepository(AppDbContext dpContext)
+        public SQLBookRepository(AppDbContext dpContext)
         {
             _dbContext = dpContext;
         }
-        public List<BookDTO> GetAllBooks()
+
+
+        public List<BookDTO> GetAllBooks(string? filterOn = null, string? filterQuery = null, string? sortBy = null, bool isAscending = true, int pageNumber = 1, int pageSize = 1000)
         {
-            var allBooksDTO = _dbContext.Books.Select(book => new BookDTO
+            var allBooks = _dbContext.Books.Select(Books => new BookDTO()
             {
-                Id = book.BookID,
-                Title = book.Title,
-                Description = book.Description,
-                IsRead = book.IsRead,
-                DateRead = book.DateRead,
-                Rate = book.Rate,
-                Genre = book.Genre,
-                CoverUrl = book.CoverUrl,
-                PublisherName = book.Publishers.Name,
-                AuthorName = book.Book_Authors.Select(n => n.Author.FullName).ToList(),
-            }).ToList();
-            return allBooksDTO;
+                Id = Books.BookID,
+                Title = Books.Title,
+                Description = Books.Description,
+                IsRead = Books.IsRead,
+                DateRead = (bool)Books.IsRead ? Books.DateRead.Value : null,
+                Rate = (bool)Books.IsRead ? Books.Rate.Value : null,
+                Genre = Books.Genre,
+                CoverUrl = Books.CoverUrl,
+                PublisherName = Books.Publishers.Name,
+                AuthorName = Books.Book_Authors.Select(n => n.Author.FullName).ToList()
+            }).AsQueryable();
+            //filtering
+            if (string.IsNullOrWhiteSpace(filterOn) == false &&
+           string.IsNullOrWhiteSpace(filterQuery) == false)
+            {
+                if (filterOn.Equals("title", StringComparison.OrdinalIgnoreCase))
+                {
+                    allBooks = allBooks.Where(x => x.Title.Contains(filterQuery));
+                }
+            }
+            //sorting
+            if (string.IsNullOrWhiteSpace(sortBy) == false)
+            {
+                if (sortBy.Equals("title", StringComparison.OrdinalIgnoreCase))
+                {
+                    allBooks = isAscending ? allBooks.OrderBy(x => x.Title) :
+                   allBooks.OrderByDescending(x => x.Title);
+                }
+            }
+            //pagination
+            var skipResults = (pageNumber - 1) * pageSize;
+            return allBooks.Skip(skipResults).Take(pageSize).ToList();
         }
+
+
+
 
         public BookDTO GetBookById(int id)
         {
